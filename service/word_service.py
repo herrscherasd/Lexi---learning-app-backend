@@ -4,6 +4,8 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.words import Word
+from app.db.session import SessionLocal
+from service.ai_service import enrich_words
 
 def process_raw_text(
         *,
@@ -69,3 +71,38 @@ def create_word(
 
     return new_word
 
+async def enrich_and_update_words(
+        *,
+        user_id: int,
+        words: list[str],
+):
+    db = SessionLocal()
+
+    try:
+        ai_results = await enrich_words(words)
+
+        for item in ai_results:
+            word = (
+                db.query(Word)
+                .filter(
+                    Word.user_id == user_id,
+                    Word.word == item["word"],
+                )
+                .first()
+            )
+            if not word:
+                continue
+
+            word.translation = item["translation"]
+            word.part_of_speech = item["part_of_speech"]
+            word.level = item["level"]
+            word.topic = item["topic"]
+            word.example = item["example"]
+
+        db.commit()
+
+    except Exception as exc:
+        print("🔥 AI BACKGROUND ERROR:", exc)
+
+    finally:
+        db.close()
