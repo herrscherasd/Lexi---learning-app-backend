@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from core.config import settings
 
 def create_access_token(subject: Any) -> str:
-    expire = datetime.now(UTC) + timedelta(days=settings.ACCESS_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=settings.JWT_EXPIRE_DAYS)
 
     payload = {
         "sub": str(subject),

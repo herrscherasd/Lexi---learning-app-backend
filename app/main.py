@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api import auth, users
+from app.api import auth, users, words
 
 app = FastAPI(
     title="Lexi Platform API",
@@ -9,3 +9,4 @@ app = FastAPI(
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(words.router)

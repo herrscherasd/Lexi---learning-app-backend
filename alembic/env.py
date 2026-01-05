@@ -18,6 +18,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 from app.db.base import Base
 from app.models.user import User
+from app.models.words import Word
 
 target_metadata = Base.metadata
 
