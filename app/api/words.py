@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, BackgroundTasks, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List
@@ -95,3 +95,55 @@ def retry_failed_words(
         )
 
     return failed_words
+
+@router.post("/{word_id}/answer", response_model=WordResponse)
+def answer_word(
+        word_id: int,
+        correct: bool = Query(...),
+        user_id: int = Depends(get_current_user_id),
+        db: Session = Depends(get_db),
+):
+    word = (
+        db.query(Word)
+        .filter(
+            Word.user_id == user_id,
+            Word.id == word_id,
+        )
+        .first()
+    )
+
+    if not word:
+        raise HTTPException(
+            status_code=404,
+            detail="Word not found",
+        )
+
+    if correct:
+        word.strength += 0.2
+    else:
+        word.strength -= 0.3
+
+    word.strength = max(0.0, min(word.strength, 1.0))
+
+    db.commit()
+    db.refresh(word)
+
+    return word
+
+@router.get("/flashcards", response_model=List[WordResponse])
+def get_flashcards(
+        limit: int = Query(default=10, ge=1, le=30),
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id),
+):
+    return (
+        db.query(Word)
+        .filter(
+            Word.user_id == user_id,
+            Word.status == "ready",
+            Word.strength < 0.4,
+        )
+        .order_by(Word.created_at.asc())
+        .limit(limit)
+        .all()
+    )

@@ -1,4 +1,4 @@
-import re
+import regex as re
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -7,31 +7,68 @@ from app.models.words import Word
 from app.db.session import SessionLocal
 from service.ai_service import enrich_words
 
+COMMON_PHRASES = {
+    "güle güle",
+    "ne haber",
+    "iyi günler",
+    "iyi akşamlar",
+    "hoş geldin",
+    "hoşça kal",
+}
+
+def extract_candidates(text: str) -> set[str]:
+    text = text.lower()
+
+    tokens = re.findall(r"\p{L}+", text)
+
+    candidates: set[str] = set(tokens)
+
+    for i in range(len(tokens) - 1):
+        w1, w2 = tokens[i], tokens[i + 1]
+
+        if w1 == w2:
+            candidates.add(f"{w1} {w2}")
+            continue
+
+        phrase = f"{w1} {w2}"
+        if phrase in COMMON_PHRASES:
+            candidates.add(phrase)
+
+    return candidates
+
 def process_raw_text(
         *,
         user_id: int,
         raw_text: str,
         db: Session,
 ) -> List[Word]:
-    text = raw_text.lower()
 
-    words = set(re.findall(r"[^\W\d_]+", text, flags=re.UNICODE))
+    candidates = extract_candidates(raw_text)
 
-    saved_words = []
+    saved_words: List[Word] = []
 
-    for w in words:
+    for item in candidates:
+        if len(item) < 2:
+            continue
+
         exists = (
             db.query(Word)
-            .filter(Word.user_id == user_id, Word.word == w)
+            .filter(
+                Word.user_id == user_id,
+                Word.word == item,
+            )
             .first()
         )
+
         if exists:
             continue
 
         new_word = Word(
             user_id=user_id,
-            word=w,
+            word=item,
             translation="",
+            status="pending",
+            strength=0.0,
         )
 
         db.add(new_word)
